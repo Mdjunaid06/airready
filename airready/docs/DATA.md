@@ -32,7 +32,12 @@ allows — they are meaningfully harder and not necessary to prove the concept.
   engine is provided in a separate `RUL_*.txt` file. **Always evaluate against this
   official test split**, not an arbitrary random split (see `docs/ML.md` Section 3).
 
-### How to download (you must do this locally — not available inside this environment)
+### Dataset availability and download fallback
+
+The FD001 train, test, and RUL files are committed at `ml/data/CMAPSS/` so a fresh
+clone can run the demo without a separate data transfer. If those files are absent
+(for example, when using an older clone or another subset), download the NASA
+Turbofan Engine Degradation Simulation Data Set and place the FD001 files there.
 
 1. Go to the NASA Prognostics Data Repository / PCoE page for Turbofan Engine
    Degradation Simulation Data, or the mirrored download on the PHM Society /
@@ -46,8 +51,8 @@ allows — they are meaningfully harder and not necessary to prove the concept.
    ├── RUL_FD001.txt
    └── ... (FD002–FD004 similarly, if used)
    ```
-4. `ml/data/` is gitignored (large data files should not be committed) — only
-   `ml/data/README.md` (a pointer, not the data itself) is tracked in git.
+4. The public FD001 files are tracked in this repository for teammate onboarding.
+  Keep private, classified, or non-public operational data out of git.
 
 ---
 

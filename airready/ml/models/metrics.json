@@ -1,0 +1,66 @@
+{
+  "dataset_subset": "FD001",
+  "window_size": 30,
+  "random_seed": 42,
+  "dropped_sensors": [
+    "sensor_1",
+    "sensor_5",
+    "sensor_10",
+    "sensor_16",
+    "sensor_18",
+    "sensor_19"
+  ],
+  "mae_cycles": 19.43,
+  "rmse_cycles": 26.4,
+  "confusion_matrix_labels": [
+    "healthy",
+    "watch",
+    "urgent"
+  ],
+  "confusion_matrix": [
+    [
+      65,
+      2,
+      0
+    ],
+    [
+      5,
+      15,
+      3
+    ],
+    [
+      0,
+      2,
+      8
+    ]
+  ],
+  "tier_metrics": {
+    "healthy": {
+      "precision": 0.929,
+      "recall": 0.97,
+      "f1": 0.949,
+      "support": 67
+    },
+    "watch": {
+      "precision": 0.789,
+      "recall": 0.652,
+      "f1": 0.714,
+      "support": 23
+    },
+    "urgent": {
+      "precision": 0.727,
+      "recall": 0.8,
+      "f1": 0.762,
+      "support": 10
+    }
+  },
+  "watch_threshold_cycles": 50,
+  "urgent_threshold_cycles": 15,
+  "comparison": {
+    "fixed_interval_missed_failures": 39,
+    "predictive_missed_failures": 2,
+    "fixed_interval_unnecessary_services": 33,
+    "predictive_unnecessary_services": 2,
+    "total_test_engines": 100
+  }
+}

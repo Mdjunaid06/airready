@@ -1,17 +1,23 @@
-"""
-Re-generates the metrics report from a saved model, without retraining.
-Also computes the fixed-interval-vs-predictive comparison used in /comparison
-and the PPT's "why we're better" chart.
+"""Recomputes the baseline-vs-predictive comparison without retraining.
+
+The comparison is written to metrics.json and the serialized model bundle so
+the backend can serve the same evaluated result after its next startup.
 
 Run from repo root: python -m ml.src.evaluate
 See docs/TESTING.md Section 1 — re-run this before trusting any number in the PPT.
 """
 import json
+from pathlib import Path
 
 import joblib
 import numpy as np
 
-from .config import URGENT_THRESHOLD_CYCLES, WATCH_THRESHOLD_CYCLES, MODEL_OUTPUT_PATH
+from .config import (
+    METRICS_OUTPUT_PATH,
+    MODEL_OUTPUT_PATH,
+    URGENT_THRESHOLD_CYCLES,
+    WATCH_THRESHOLD_CYCLES,
+)
 from .data_loader import load_test_data, load_test_rul_labels
 from .features import build_window_features, normalize_features
 
@@ -26,24 +32,25 @@ def _status_for_rul(rul: float) -> str:
 
 def compute_baseline_vs_predictive(y_true, y_pred, fixed_interval_cycles: int = 60) -> dict:
     """
-    Simulates a naive fixed-interval maintenance policy (service every N cycles
-    regardless of condition) on the same test engines, and compares it against
-    our predictive approach.
+    Compare a fixed service interval with predicted health tiers.
 
-    "Missed failure" = the policy would NOT have flagged the engine before its
-    true RUL ran out. "Unnecessary service" = the policy triggers service while
-    the engine was still comfortably healthy (true RUL still well above threshold).
+    A fixed-interval service is late when true RUL is no greater than the
+    interval. A predictive miss is an actually urgent engine not predicted
+    urgent, including a downgrade to watch. A predictive unnecessary service
+    is a watch/urgent prediction for an engine whose true tier is healthy.
+    Fixed unnecessary service retains the conservative "comfortably healthy"
+    definition: true RUL greater than twice the watch threshold.
     """
-    fixed_missed = sum(1 for rul in y_true if rul > fixed_interval_cycles)
+    fixed_missed = sum(1 for rul in y_true if rul <= fixed_interval_cycles)
     fixed_unnecessary = sum(1 for rul in y_true if rul > WATCH_THRESHOLD_CYCLES * 2)
 
     predictive_missed = sum(
         1 for true_r, pred_r in zip(y_true, y_pred)
-        if _status_for_rul(pred_r) == "healthy" and true_r <= URGENT_THRESHOLD_CYCLES
+        if _status_for_rul(true_r) == "urgent" and _status_for_rul(pred_r) != "urgent"
     )
     predictive_unnecessary = sum(
         1 for true_r, pred_r in zip(y_true, y_pred)
-        if _status_for_rul(pred_r) in ("watch", "urgent") and true_r > WATCH_THRESHOLD_CYCLES * 2
+        if _status_for_rul(true_r) == "healthy" and _status_for_rul(pred_r) != "healthy"
     )
 
     return {
@@ -69,9 +76,17 @@ def main():
     last_window = test_features.sort_values("cycle").groupby("engine_id").tail(1).sort_values("engine_id")
 
     X_test = last_window[feature_cols]
-    y_pred = model.predict(X_test)
+    y_pred = np.maximum(model.predict(X_test), 0)
 
     comparison = compute_baseline_vs_predictive(true_rul[: len(y_pred)], y_pred)
+    saved["comparison"] = comparison
+    joblib.dump(saved, MODEL_OUTPUT_PATH)
+
+    metrics_path = Path(METRICS_OUTPUT_PATH)
+    metrics = json.loads(metrics_path.read_text())
+    metrics["comparison"] = comparison
+    metrics_path.write_text(json.dumps(metrics, indent=2) + "\n")
+
     print(json.dumps(comparison, indent=2))
     return comparison
 

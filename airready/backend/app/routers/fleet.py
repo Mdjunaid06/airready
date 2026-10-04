@@ -2,18 +2,10 @@
 Fleet, engine-detail, alerts, spares, and comparison endpoints.
 Request/response shapes must match docs/API_CONTRACTS.md exactly — see
 docs/BACKEND.md Section 3 for the convention.
-
-NOTE ON CURRENT STATE: this router currently serves DEMO/PLACEHOLDER engine data
-(see `_DEMO_ENGINES` below) so the API is runnable and the frontend can be built
-against it immediately, in parallel with the ML model being trained (see
-docs/ARCHITECTURE.md Section 2 on why the layers are decoupled this way).
-
-TODO (Day 2): replace `_DEMO_ENGINES` with real predictions loaded from
-`ml/models/rul_model.pkl` via `app.main`'s loaded model instance, run over the
-NASA C-MAPSS test-set engines. Do not remove the illustrative-data honesty rules
-when you do this — only the engine/RUL data source changes; spares/maintenance
-data stays synthetic and labelled as such.
 """
+from math import ceil
+
+import pandas as pd
 from fastapi import APIRouter, HTTPException
 
 from app.models.schemas import (
@@ -24,35 +16,49 @@ from app.models.spares import get_spares_table, link_spares_to_engine
 
 router = APIRouter()
 
-# Healthy/Watch/Urgent thresholds — MUST match ml/src/config.py once the real
-# model is wired in. Kept here as placeholders for the demo-data path only.
-WATCH_THRESHOLD_CYCLES = 50
-URGENT_THRESHOLD_CYCLES = 15
-
-
-def _status_for_rul(rul: int) -> str:
-    if rul <= URGENT_THRESHOLD_CYCLES:
+def _status_for_rul(rul: int, bundle: dict) -> str:
+    if rul <= bundle["urgent_threshold_cycles"]:
         return "urgent"
-    if rul <= WATCH_THRESHOLD_CYCLES:
+    if rul <= bundle["watch_threshold_cycles"]:
         return "watch"
     return "healthy"
 
 
-# Placeholder demo engines — deterministic, not random, so the demo is reproducible.
-_DEMO_ENGINES = [
-    {"engine_id": f"engine_{i}", "predicted_rul_cycles": rul, "confidence_low": max(rul - 12, 0), "confidence_high": rul + 12}
-    for i, rul in enumerate(
-        [145, 132, 98, 210, 9, 61, 178, 44, 12, 199, 87, 33, 150, 7, 120, 55, 190, 29, 101, 48],
-        start=1,
-    )
-]
+def build_engine_predictions(bundle: dict) -> list[dict]:
+    """Run the loaded model on persisted features for the NASA test engines."""
+    model = bundle["model"]
+    feature_cols = bundle["feature_cols"]
+    error_band = ceil(bundle["mae_cycles"])
+    engines = []
+    for engine_input in bundle["test_engine_inputs"]:
+        features = pd.DataFrame([engine_input["features"]], columns=feature_cols)
+        prediction = max(float(model.predict(features)[0]), 0.0)
+        predicted_rul = int(round(prediction))
+        engines.append({
+            "engine_id": engine_input["engine_id"],
+            "predicted_rul_cycles": predicted_rul,
+            "confidence_low": max(predicted_rul - error_band, 0),
+            "confidence_high": predicted_rul + error_band,
+            "sensor_history": engine_input["sensor_history"],
+            "status": _status_for_rul(predicted_rul, bundle),
+        })
+    return engines
+
+
+def _get_runtime_data() -> tuple[dict, list[dict]]:
+    from app.main import model_registry
+
+    bundle = model_registry["bundle"]
+    engines = model_registry["engines"]
+    if bundle is None or engines is None:
+        raise HTTPException(status_code=503, detail="Model is not loaded")
+    return bundle, engines
 
 
 def _summarize(engine: dict) -> EngineSummary:
-    status = _status_for_rul(engine["predicted_rul_cycles"])
     return EngineSummary(
         engine_id=engine["engine_id"],
-        status=status,
+        status=engine["status"],
         predicted_rul_cycles=engine["predicted_rul_cycles"],
         confidence_low=engine["confidence_low"],
         confidence_high=engine["confidence_high"],
@@ -61,7 +67,8 @@ def _summarize(engine: dict) -> EngineSummary:
 
 @router.get("/fleet", response_model=FleetResponse)
 def get_fleet() -> FleetResponse:
-    summaries = [_summarize(e) for e in _DEMO_ENGINES]
+    _, engines = _get_runtime_data()
+    summaries = [_summarize(e) for e in engines]
     total = len(summaries)
     healthy = sum(1 for s in summaries if s.status == "healthy")
     watch = sum(1 for s in summaries if s.status == "watch")
@@ -80,40 +87,34 @@ def get_fleet() -> FleetResponse:
 
 @router.get("/engine/{engine_id}", response_model=EngineDetailResponse)
 def get_engine_detail(engine_id: str) -> EngineDetailResponse:
-    engine = next((e for e in _DEMO_ENGINES if e["engine_id"] == engine_id), None)
+    _, engines = _get_runtime_data()
+    engine = next((e for e in engines if e["engine_id"] == engine_id), None)
     if engine is None:
         raise HTTPException(status_code=404, detail="Engine not found")
 
-    status = _status_for_rul(engine["predicted_rul_cycles"])
     linked = [p["part_id"] for p in link_spares_to_engine(engine_id)]
-
-    # TODO (Day 2): replace with real sensor_history pulled from the C-MAPSS test
-    # set for this engine, once the ML model + data loader are wired in.
-    fake_history = [
-        {"cycle": c, "sensor_2": 640 + c * 0.1, "sensor_3": 1580 + c * 0.3}
-        for c in range(1, 21)
-    ]
 
     return EngineDetailResponse(
         engine_id=engine_id,
-        status=status,
+        status=engine["status"],
         predicted_rul_cycles=engine["predicted_rul_cycles"],
         confidence_low=engine["confidence_low"],
         confidence_high=engine["confidence_high"],
-        sensor_history=fake_history,
+        sensor_history=engine["sensor_history"],
         linked_spares=linked,
     )
 
 
 @router.get("/alerts", response_model=AlertsResponse)
 def get_alerts() -> AlertsResponse:
-    at_risk = [e for e in _DEMO_ENGINES if _status_for_rul(e["predicted_rul_cycles"]) in ("watch", "urgent")]
+    _, engines = _get_runtime_data()
+    at_risk = [e for e in engines if e["status"] in ("watch", "urgent")]
     at_risk.sort(key=lambda e: e["predicted_rul_cycles"])
 
     alerts = [
         AlertItem(
             engine_id=e["engine_id"],
-            status=_status_for_rul(e["predicted_rul_cycles"]),
+            status=e["status"],
             predicted_rul_cycles=e["predicted_rul_cycles"],
             linked_spares=[SparePartAlert(**p) for p in link_spares_to_engine(e["engine_id"])],
         )
@@ -129,14 +130,5 @@ def get_spares() -> SparesResponse:
 
 @router.get("/comparison", response_model=ComparisonResponse)
 def get_comparison() -> ComparisonResponse:
-    # TODO (Day 2): compute these numbers for real from ml/src/evaluate.py's
-    # baseline-vs-predictive simulation on the NASA test set. Placeholder values
-    # below are illustrative of the shape only — do not present them as real
-    # results in the PPT until replaced.
-    return ComparisonResponse(
-        fixed_interval_missed_failures=6,
-        predictive_missed_failures=1,
-        fixed_interval_unnecessary_services=11,
-        predictive_unnecessary_services=4,
-        total_test_engines=len(_DEMO_ENGINES),
-    )
+    bundle, _ = _get_runtime_data()
+    return ComparisonResponse(**bundle["comparison"])

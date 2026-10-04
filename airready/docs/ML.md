@@ -20,9 +20,9 @@ This is a regression problem on NASA's C-MAPSS dataset (see `docs/DATA.md`).
 ```
 ml/
 ├── requirements.txt
-├── data/                     # raw + processed data (gitignored except a README pointer)
-│   └── README.md               # explains how to download the dataset locally (see DATA.md)
-├── models/                    # trained artifacts (gitignored except metrics.json)
+├── data/                     # committed public FD001 benchmark data
+│   └── README.md               # dataset location and download fallback (see DATA.md)
+├── models/                    # committed demo model artifact and evaluation metrics
 │   ├── rul_model.pkl            # the trained model — backend loads this directly
 │   └── metrics.json              # MAE, RMSE, confusion matrix — used in the PPT
 ├── notebooks/                 # exploratory analysis — not production code, keep separate
@@ -57,9 +57,13 @@ ml/
      using the official split is what makes our MAE/RMSE numbers comparable to published
      benchmarks, which matters for credibility with judges).
    - Converts predicted RUL into the three health tiers (Healthy/Watch/Urgent) using
-     thresholds defined in `config.py`, and computes a confusion matrix against the
-     true-RUL-derived tiers — this is the number that shows our false-negative rate.
+     thresholds defined in `config.py`, and computes a confusion matrix plus per-tier
+     precision, recall, and F1 against the true-RUL-derived tiers.
    - Writes `models/rul_model.pkl` (joblib-serialized) and `models/metrics.json`.
+   - The serialized bundle also carries pre-engineered inputs and raw sensor history
+     for the official test engines, plus the baseline comparison result. The backend
+     uses these demo inputs with the loaded estimator at startup; it does not import ML
+     training code or read the raw dataset at request time.
 4. **`evaluate.py`** can be re-run standalone against a saved model to regenerate the
    metrics report without retraining — useful right before the demo to double-check
    numbers match what's in the PPT.
@@ -89,7 +93,8 @@ ml/
 | MAE (cycles) | Standard, comparable metric for C-MAPSS RUL prediction — directly citable against published research |
 | RMSE (cycles) | Penalises large misses more — relevant because a large miss is the dangerous failure mode |
 | Confusion matrix (Healthy/Watch/Urgent) | Shows false-negative rate directly — the single most important number for a safety-critical system (see `PROJECT_BRAIN.md` rule 2) |
-| Early-catch comparison vs fixed-interval baseline | The actual "why this is better" number for the pitch — computed in `evaluate.py` by simulating a naive fixed-cycle maintenance policy on the same test engines |
+| Per-tier precision and recall | Makes urgent under-triage and the cost of additional inspections visible at the selected operating point |
+| Early-catch comparison vs fixed-interval baseline | Compares interval misses and predictive tier misses/false alerts on the official test engines; definitions are kept explicit in `API_CONTRACTS.md` |
 
 **Never report only accuracy or only MAE.** Section 2 of `PROJECT_BRAIN.md` requires the
 false-negative framing to be front and centre, not buried.
@@ -101,6 +106,7 @@ false-negative framing to be front and centre, not buried.
 - Fix all random seeds (`numpy`, `xgboost`) in `config.py` — a judge re-running your
   code, or a teammate retraining, should get the same numbers.
 - `metrics.json` should record: the dataset subset used (e.g. FD001), window size,
-  dropped sensors, random seed, and the final metrics — this file is effectively the
+  dropped sensors, random seed, final metrics, per-tier precision/recall, and the
+  fixed-interval comparison — this file is effectively the
   "lab notebook" for the model and should be treated as a real artifact, not a
   throwaway file.

@@ -1,33 +1,25 @@
-"""
-FastAPI app instance. See docs/BACKEND.md for conventions.
-
-Model loading: currently a no-op placeholder (see TODO below) because the fleet
-router serves demo data until Day 2's real model integration — see
-docs/ARCHITECTURE.md Section 2 for why these layers are deliberately decoupled.
-"""
+"""FastAPI app instance and one-time model startup loading."""
 from contextlib import asynccontextmanager
 
+import joblib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import fleet
 
-model_registry = {"model": None}
+model_registry = {"bundle": None, "engines": None}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # TODO (Day 2): load the real trained model here, once ml/src/train.py has
-    # produced ml/models/rul_model.pkl. Example:
-    #
-    #   import joblib
-    #   model_registry["model"] = joblib.load(settings.model_path)
-    #
-    # Keep this load in app startup (not per-request) — see docs/BACKEND.md
-    # Section 3 on why the model must be loaded once, not reloaded per call.
+    model_registry["bundle"] = joblib.load(settings.model_path)
+    from app.routers.fleet import build_engine_predictions
+
+    model_registry["engines"] = build_engine_predictions(model_registry["bundle"])
     yield
-    model_registry["model"] = None
+    model_registry["bundle"] = None
+    model_registry["engines"] = None
 
 
 app = FastAPI(

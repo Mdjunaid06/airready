@@ -78,3 +78,35 @@ visually-driven judge demo).
 ---
 
 <!-- Add new entries below this line, most recent at the bottom -->
+
+### 2026-10-04 — Bundle benchmark inference inputs with the model artifact
+
+**Decision:** Store the official FD001 test-engine feature vectors, their observed sensor histories, tier thresholds, and baseline comparison result alongside the trained estimator. The backend loads this bundle once and runs the estimator over those inputs. Use the held-out MAE as an empirical display band for the existing `confidence_low` / `confidence_high` API fields, and describe it in the UI as an error band rather than a calibrated confidence interval.
+
+**Reasoning:** The demo can serve real NASA benchmark predictions and sensor histories without making the backend import ML training/evaluation code or depend on reading the raw dataset at runtime. Persisting the comparison computed by `compute_baseline_vs_predictive()` keeps the API contract unchanged and makes the source evaluation reproducible. Calling the bounds an empirical MAE band avoids implying statistical calibration that the pipeline does not perform.
+
+**Alternatives considered:** Recompute features and comparison inside the backend (rejected — violates the ML/backend separation); hardcode per-engine results or comparison values (rejected — placeholder data); present the MAE band as a probabilistic confidence interval (rejected — unsupported by current calibration).
+
+### 2026-10-04 — Report safety-tier recall without tuning to accuracy
+
+**Decision:** Keep the configured Watch (50-cycle) and Urgent (15-cycle) cutoffs for this evaluation, and record precision, recall, F1, support, and the confusion matrix for every tier. Treat these thresholds as provisional pending maintenance-domain calibration.
+
+**Reasoning:** On the official FD001 test split, urgent recall is 0.800 (8 of 10 true urgent engines were labeled urgent); the other two were labeled watch, and none were labeled healthy. Showing those misses and the tier precision keeps safety performance visible without tuning on headline accuracy or obscuring extra-inspection tradeoffs.
+
+**Alternatives considered:** Retune cutoffs to maximize overall accuracy on the official test set (rejected — conflicts with the safety-first rule and overfits the evaluation split); claim the current thresholds are operationally calibrated (rejected — no real fleet maintenance data is available).
+
+### 2026-10-05 — Track FD001 data and model for clone reproducibility
+
+**Decision:** Commit the public FD001 C-MAPSS text files and the small trained model artifact so a teammate can clone the repository and run the backend immediately. Continue excluding real `.env` files, local environments, dependencies, and build output.
+
+**Reasoning:** The benchmark files total about 5.5 MiB and the model about 1 MiB, well within normal GitHub file limits. Tracking them removes a fragile manual data/model handoff while preserving the ability to regenerate both from the training pipeline. No secrets or operational aircraft data belong in the repository.
+
+**Alternatives considered:** Track only a dataset pointer and require every teammate to find/download/extract the benchmark (rejected — onboarding failures); use Git LFS (unnecessary for these file sizes); commit local env files (rejected — machine-specific and may later contain secrets).
+
+### 2026-10-05 — Score tier downgrades and correct interval misses
+
+**Decision:** Count an actual urgent engine predicted as watch as a predictive miss, count any at-risk prediction on an actually healthy engine as a predictive unnecessary service, and treat true RUL at or below the fixed service interval as a fixed-interval miss. Persist standalone evaluation results to both `metrics.json` and the model bundle consumed by the backend.
+
+**Reasoning:** Per-engine diagnostics showed two urgent-to-watch downgrades and two healthy-to-watch false alerts hidden by predicates that only counted healthy under-predictions and required true RUL above twice the watch threshold. The fixed-interval predicate also counted engines with more than 60 cycles remaining as misses, reversing the one-interval failure condition. Using the existing tier boundaries exposes these errors without tuning model thresholds.
+
+**Alternatives considered:** Keep watch downgrades out of the miss count (rejected — hides failure to escalate an urgent true tier); keep the `> 2 × watch` criterion for predictive false alerts (rejected — inconsistent with the actual healthy-tier boundary); count RUL above the interval as a miss (rejected — service would be due before failure under the stated interval assumption).

@@ -11,6 +11,9 @@ maintenance. See `docs/PROJECT_BRAIN.md` for the full context.
 **Read `docs/PROJECT_BRAIN.md` before touching anything.** It is the master context
 file: problem statement, non-negotiable rules, repo map, and current status.
 
+For the full demo walkthrough, Windows setup, environment-file values, and page-by-page
+explanation, see [`DEMO_GUIDE.md`](DEMO_GUIDE.md).
+
 | I want to... | Read |
 |---|---|
 | Understand the whole project | `docs/PROJECT_BRAIN.md` |

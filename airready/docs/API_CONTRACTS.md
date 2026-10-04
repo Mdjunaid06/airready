@@ -126,13 +126,21 @@ on the NASA test set — this is the data behind the "why we're better" chart.
 **Response `200`:**
 ```json
 {
-  "fixed_interval_missed_failures": 6,
-  "predictive_missed_failures": 1,
-  "fixed_interval_unnecessary_services": 11,
-  "predictive_unnecessary_services": 4,
-  "total_test_engines": 20
+  "fixed_interval_missed_failures": 39,
+  "predictive_missed_failures": 2,
+  "fixed_interval_unnecessary_services": 33,
+  "predictive_unnecessary_services": 2,
+  "total_test_engines": 100
 }
 ```
+
+For this FD001 evaluation, a fixed-interval miss means true RUL is at or below
+the 60-cycle service interval. A predictive miss means the true tier is urgent
+but the predicted tier is not urgent (including urgent-to-watch downgrades).
+Predictive unnecessary services count at-risk predictions (watch/urgent) for
+engines whose true tier is healthy. Fixed-interval unnecessary services retain
+the stricter "comfortably healthy" definition of true RUL above twice the
+50-cycle watch threshold.
 
 ---
 

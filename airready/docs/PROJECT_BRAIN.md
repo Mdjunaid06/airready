@@ -108,18 +108,18 @@ airready/
 > person (or AI) picking this up knows exactly where things stand without reading
 > every file.
 
-- [ ] Repo scaffolded (this commit)
-- [ ] NASA C-MAPSS dataset downloaded into `ml/data/`
-- [ ] Feature engineering pipeline written (`ml/src/features.py`)
-- [ ] RUL model trained and evaluated (`ml/src/train.py`)
-- [ ] Model exported to `ml/models/rul_model.pkl`
-- [ ] Backend endpoints implemented against `docs/API_CONTRACTS.md`
-- [ ] Frontend dashboard wired to backend
-- [ ] Baseline-vs-predictive comparison chart working
+- [x] Repo scaffolded (this commit)
+- [x] NASA C-MAPSS FD001 dataset placed in `ml/data/CMAPSS/`
+- [x] Feature engineering pipeline written (`ml/src/features.py`)
+- [x] RUL model trained and evaluated (`ml/src/train.py`): MAE 19.43 cycles, RMSE 26.40 cycles; urgent precision 0.727, recall 0.800 at configured thresholds
+- [x] Model exported to `ml/models/rul_model.pkl`; metrics and confusion matrix recorded in `ml/models/metrics.json`
+- [x] Backend endpoints implemented against `docs/API_CONTRACTS.md` and backed by the trained model
+- [x] Frontend dashboard wired to the live backend and smoke-tested at desktop and mobile widths
+- [x] Baseline-vs-predictive comparison chart working on the 100-engine NASA FD001 test set
 - [ ] End-to-end demo rehearsed
 
-**Last updated by:** (fill in name/date here each session)
-**Current blocker, if any:** (fill in here)
+**Last updated by:** GitHub Copilot / 2026-10-04
+**Current blocker, if any:** End-to-end demo rehearsal remains. Ports 8000 and 5173 were already occupied during verification, so the updated backend and frontend were tested on 8001 and 5174.
 
 ---
 

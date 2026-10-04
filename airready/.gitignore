@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 venv/
 .venv/
+.venv-*/
 *.egg-info/
 
 # --- Environment files (never commit secrets) ---
@@ -16,11 +17,7 @@ node_modules/
 dist/
 .vite/
 
-# --- ML data & model artifacts (large files, regenerate instead of committing) ---
-ml/data/CMAPSS/
-ml/models/*.pkl
-# metrics.json IS tracked — it's small and useful to diff across experiments
-!ml/models/metrics.json
+# --- Public benchmark data and demo model are tracked for reproducible setup ---
 
 # --- OS / editor ---
 .DS_Store
