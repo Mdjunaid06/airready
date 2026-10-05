@@ -80,7 +80,7 @@ See `backend/.env.example` for the full, current list with comments. At minimum:
 | Variable | Purpose | Example |
 |---|---|---|
 | `PORT` | Port Uvicorn binds to | `8000` |
-| `MODEL_PATH` | Path to the trained model artifact | `../ml/models/rul_model.pkl` |
+| `MODEL_PATH` | Path to the trained model artifact; relative paths resolve from `backend/` | `app/model_artifact/rul_model.pkl` |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins | `http://localhost:5173` |
 
 ---

@@ -1,5 +1,6 @@
 """FastAPI app instance and one-time model startup loading."""
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import joblib
 from fastapi import FastAPI
@@ -13,7 +14,11 @@ model_registry = {"bundle": None, "model": None, "engines": None}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    model_registry["bundle"] = joblib.load(settings.model_path)
+    model_path = Path(settings.model_path)
+    if not model_path.is_absolute():
+        model_path = Path(__file__).resolve().parent.parent / model_path
+
+    model_registry["bundle"] = joblib.load(model_path)
     model_registry["model"] = model_registry["bundle"]["model"]
     from app.routers.fleet import build_engine_predictions
 
