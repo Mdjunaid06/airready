@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     port: int = 8000
-    model_path: str = "../ml/models/rul_model.pkl"
+    model_path: str = "app/model_artifact/rul_model.pkl"
     cors_origins: str = "http://localhost:5173"
 
     class Config:

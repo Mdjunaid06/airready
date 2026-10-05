@@ -8,17 +8,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import fleet
 
-model_registry = {"bundle": None, "engines": None}
+model_registry = {"bundle": None, "model": None, "engines": None}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     model_registry["bundle"] = joblib.load(settings.model_path)
+    model_registry["model"] = model_registry["bundle"]["model"]
     from app.routers.fleet import build_engine_predictions
 
     model_registry["engines"] = build_engine_predictions(model_registry["bundle"])
     yield
     model_registry["bundle"] = None
+    model_registry["model"] = None
     model_registry["engines"] = None
 
 
